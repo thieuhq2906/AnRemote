@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ipa:
+    name: iOS app (.ipa chưa ký)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project AnRemote.xcodeproj \
+            -scheme AnRemote \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" | tail -n 200
+
+      - name: Package .ipa
+        working-directory: ios
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/AnRemote.app Payload/
+          zip -qry AnRemote.ipa Payload
+          ls -lh AnRemote.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnRemote-ipa
+          path: ios/AnRemote.ipa
+          if-no-files-found: error
+
+  firmware:
+    name: Firmware ESP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build
+        run: pio run -d firmware -e d1_mini -e nodemcuv2 -e esp32dev
+
+      - name: Collect binaries
+        run: |
+          mkdir out
+          for env in d1_mini nodemcuv2 esp32dev; do
+            cp "firmware/.pio/build/$env/firmware.bin" "out/anremote-$env.bin"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnRemote-firmware
+          path: out/*.bin
+          if-no-files-found: error

@@ -1,0 +1,14 @@
+# iOS
+ios/build/
+ios/Payload/
+ios/*.xcodeproj/
+ios/AnRemote/Info.plist
+*.ipa
+.DS_Store
+
+# Firmware
+firmware/.pio/
+firmware/.vscode/
+
+# Tai ve tu CI
+dist/
